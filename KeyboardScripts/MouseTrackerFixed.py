@@ -11,7 +11,7 @@ usage         = 0x61
 report_length = 32
 
 # COMPLETE STARS80 PHYSICAL MATRIX MAP (6 Rows x 17 Columns)
-# Follows your layout pattern from row 0 down to row 5.
+# Fully populated to fix the naked array syntax crash
 LAYOUT_MAP = [
     # Row 0: Esc (0) -> F13 (13) -> PrtSc (14) -> Pause (16) [Left to Right]
     [0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13, 14, 15, 16],
@@ -65,12 +65,12 @@ def send_raw_report(interface, data):
 if __name__ == '__main__':
     keyboard = get_raw_hid_interface()
     if keyboard:
-        print(f"Connected to: {keyboard.get_product_string()} (6-Row Snake Grid Mode)")
+        print(f"Connected to: {keyboard.get_product_string()} (Multi-Key Packet Mode)")
     else:
         print("Stars80 Keyboard not found! Check connection.")
         sys.exit(1)
 
-    print("\n--- Stars80 Absolute 2D Coordinate Tracker ---")
+    print("\n--- Stars80 Multi-Key Protocol Tracker ---")
     print("Move your mouse anywhere on your screen to target keys!")
     print("Press Ctrl+C in this window to terminate layout tracking.\n")
 
@@ -81,7 +81,6 @@ if __name__ == '__main__':
             # 1. Capture cursor position
             mx, my = mouse.get_position()
             
-            # Match your monitor resolution bounds
             screen_width = 1920
             screen_height = 1080
             
@@ -102,21 +101,25 @@ if __name__ == '__main__':
 
             # 5. Send report if layout coordinates change
             if led_idx != last_led_idx:
-                # Clear trace from previous index block location
+                # Clear trace from previous index block location using batched protocol
                 if last_led_idx != -1:
                     clear_payload = [0x00] * 32
-                    clear_payload[0] = last_led_idx
-                    clear_payload[1] = 0
-                    clear_payload[2] = 0
-                    clear_payload[3] = 0
+                    clear_payload[0] = 0x02            # Command: Batch Update
+                    clear_payload[1] = 1               # Total keys inside packet: 1
+                    clear_payload[2] = last_led_idx    # Index location targeting
+                    clear_payload[3] = 0               # Reset R
+                    clear_payload[4] = 0               # Reset G
+                    clear_payload[5] = 0               # Reset B
                     send_raw_report(keyboard, clear_payload)
 
-                # Illuminate the targeted cell array key 
+                # Illuminate the targeted cell array key using the multi-key command 0x02
                 payload = [0x00] * 32
-                payload[0] = led_idx
-                payload[1] = r
-                payload[2] = g
-                payload[3] = b
+                payload[0] = 0x02            # Command: Batch Update
+                payload[1] = 1               # Total keys inside packet: 1
+                payload[2] = led_idx         # Index location targeting
+                payload[3] = r               # Set R
+                payload[4] = g               # Set G
+                payload[5] = b               # Set B
                 send_raw_report(keyboard, payload)
                 
                 print(f"Screen Grid[{row},{col}] -> LED Key Index: {led_idx:2d} | RGB({r},{g},{b})      ", end="\r")
@@ -129,7 +132,9 @@ if __name__ == '__main__':
     finally:
         if last_led_idx != -1:
             clear_payload = [0x00] * 32
-            clear_payload[0] = last_led_idx
+            clear_payload[0] = 0x02
+            clear_payload[1] = 1
+            clear_payload[2] = last_led_idx
             send_raw_report(keyboard, clear_payload)
             
         keyboard.close()

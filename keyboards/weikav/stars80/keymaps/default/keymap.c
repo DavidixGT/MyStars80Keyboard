@@ -1,5 +1,3 @@
-// Copyright 2024 Wind (@yelishang)
-// SPDX-License-Identifier: GPL-2.0-or-later
 #include "print.h"
 #include QMK_KEYBOARD_H
 #include "raw_hid.h"
@@ -63,9 +61,6 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 		_______, _______, _______, _______,                   _______,                   _______, _______, _______, _______, _______, MY_SPEED_DOWN, MY_BRIGHTNESS_DOWN, MY_SPEED_UP
     )
 };
-// clang-format on
-
-// Custom event handler matrix intercepting key presses programmatically
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     switch (keycode) {
         case MY_CYCLE_KEY:
@@ -192,64 +187,53 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
         default:
             return true; // Pass through all other keys normally
-
-            
     }
 }
-/*
+#define DRIVER_MAX_LEDS 88
+uint8_t global_red_buffer[DRIVER_MAX_LEDS]   = {0};
+uint8_t global_green_buffer[DRIVER_MAX_LEDS] = {0};
+uint8_t global_blue_buffer[DRIVER_MAX_LEDS]  = {0};
 
-// Storage variables for cursor tracking (scaled 0-255)
-uint8_t cursor_x = 0;
-uint8_t cursor_y = 0;
-
-
-// Intercept data packets coming from the PC background script
 void raw_hid_receive(uint8_t *data, uint8_t length) {
-    // Check all possible index offsets where the X coordinate could land (index 0, 1, or 2)
-    // This allows the values to catch instantly regardless of Windows USB shifting or padding variations
-    if (data[0] > 0 || data[1] > 0 || data[2] > 0) {
-        
-        // If data[0] is our header ID, pull coordinates from standard placement
-        if (data[0] == 0x99) {
-            cursor_x = data[1];
-            cursor_y = data[2];
-        } 
-        // If Windows shifts index 0 to become 0x99, grab indices 1 and 2
-        else if (data[1] == 0x99) {
-            cursor_x = data[2];
-            cursor_y = data[3];
+    if (length == 32) {
+        uint8_t command_type = data[0]; // Protocol index
+
+        // Command 0x01: Dynamic Reset (Turn off all custom keys)
+        if (command_type == 0x01) {
+            for (uint8_t i = 0; i < DRIVER_MAX_LEDS; i++) {
+                global_red_buffer[i]   = 0;
+                global_green_buffer[i] = 0;
+                global_blue_buffer[i]  = 0;
+            }
         }
-        // Fallback: If your OS entirely blocks the 0x99 ID tag, automatically bind the two largest packet values
-        else {
-            cursor_x = (data[0] > 0) ? data[0] : data[1];
-            cursor_y = (data[1] > data[0]) ? data[1] : data[2];
-        }
+        // Command 0x02: Batch Key Update [Type, NumKeys, Key1, R1, G1, B1, Key2, R2...]
+        else if (command_type == 0x02) {
+            uint8_t num_keys = data[1];
+            uint8_t offset   = 2;
+
+            for (uint8_t k = 0; k < num_keys; k++) 
+            {
+                if (offset + 3 >= 32) break; // Buffer guard
+                uint8_t target_idx = data[offset];
+                if (target_idx < DRIVER_MAX_LEDS) 
+                {
+                    global_red_buffer[target_idx]   = data[offset + 1];global_green_buffer[target_idx] = data[offset + 2];
+                    global_blue_buffer[target_idx]  = data[offset + 3];
+                }
+                    offset += 4; // Step to the next batch segment
+            }      
+        }  
+    }   
+}
+bool rgb_matrix_indicators_user(void) 
+{
+    #if defined(RGB_MATRIX_ENABLE)// Continuously paint the color memory maps over the keys
+    
+    for (uint8_t i = 0; i < DRIVER_MAX_LEDS; i++)
+    if (global_red_buffer[i] > 0 || global_green_buffer[i] > 0 || global_blue_buffer[i] > 0) 
+    {
+        rgb_matrix_set_color(i, global_red_buffer[i], global_green_buffer[i], global_blue_buffer[i]);
     }
-}
-*/
-
-// !!! IMPORTANT: Replace 12 with your board's actual Backspace LED index !!!
-
-
-uint8_t python_red   = 0;
-uint8_t python_green = 0;
-uint8_t python_blue  = 0;
-uint8_t keyIndex = 0;
-void raw_hid_receive(uint8_t *data, uint8_t length) {
-    uint8_t response[length];
-    memset(response, 0, length);
-    response[0] = 'B';
-    keyIndex = data[0];
-    python_red = data[1];
-    python_green = data[2];
-    python_blue = data[3];
-}
-
-bool rgb_matrix_indicators_user(void) {
-    #ifdef RGB_MATRIX_ENABLE
-        // This function draws last, effectively locking your custom color down
-        //rgb_matrix_set_color(1, 255, 255, 255);
-        rgb_matrix_set_color(keyIndex, python_red, python_green, python_blue);
     #endif
     return true;
 }
