@@ -1,0 +1,14 @@
+cd "C:\Users\mrcra\qmk_firmware\keyboards\weikav\stars80\KeyboardScripts"
+
+python mouse_tracker.py
+
+
+cd "C:\Users\mrcra\qmk_firmware\keyboards\weikav\stars80\KeyboardScripts"
+
+
+python send_data.py
+python pythondebug.py
+python DebugConsole.py
+python mouse_tracker.py
+python MouseTrackerFixed.py
+VID: 0x342d, PID: 0xe401
