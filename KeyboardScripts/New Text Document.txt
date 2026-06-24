@@ -1,7 +1,17 @@
+cd C:\Users\mrcra\qmk_firmware\KeyboardScripts
+.\.venv\Scripts\Activate.ps1
 
 
-python mouse_tracker.py
-C:\Users\mrcra\qmk_firmware\KeyboardScripts
+
+///do it just once to set up virtual envirnoment
+C:\Users\mrcra\AppData\Local\Programs\Python\Python310\python.exe -m venv .venv
+///do it just once to set up virtual envirnoment
+.\.venv\Scripts\Activate.ps1
+///do it just once to set up virtual envirnoment
+pip install hidapi
+pip install keyboard
+pip install mouse
+
 
 
 python send_data.py
